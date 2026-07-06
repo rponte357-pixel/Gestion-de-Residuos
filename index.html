@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>EcoReto Pro · Ley 7/2022</title>
+<style>
+  :root{
+    --fondo:#eaf2ec;
+    --tinta:#1e3226;
+    --tarjeta:#ffffff;
+    --ok:#2e7d32;
+    --mal:#c62828;
+    --azul:#0d47a1;    --azul-osc:#092f6b;
+    --amarillo:#fdd835;--amarillo-osc:#c8a415;
+    --verde:#1b5e20;   --verde-osc:#0f3d13;
+    --marron:#5d4037;  --marron-osc:#3e2b24;
+    --gris:#6d6d6d;    --gris-osc:#4a4a4a;
+    --limpio:#e65100;  --limpio-osc:#a83b00;
+  }
+  *{ -webkit-tap-highlight-color:transparent; }
+  html,body{ height:100%; }
+  body{
+    margin:0;
+    font-family:'Segoe UI', system-ui, -apple-system, sans-serif;
+    background:
+      radial-gradient(circle at 20% 0%, #f4faf1 0%, transparent 55%),
+      var(--fondo);
+    color:var(--tinta);
+    overscroll-behavior:none;
+    touch-action:manipulation;
+    user-select:none; -webkit-user-select:none;
+  }
+
+  .app{
+    max-width:520px;
+    margin:0 auto;
+    height:100dvh;
+    display:flex;
+    flex-direction:column;
+    padding:8px 10px calc(10px + env(safe-area-inset-bottom));
+    box-sizing:border-box;
+    gap:6px;
+  }
+
+  /* ---------- Cabecera ---------- */
+  header{ text-align:center; }
+  h1{
+    margin:0; font-size:1.15rem; letter-spacing:.02em; color:var(--verde);
+  }
+  h1 small{ font-weight:600; color:#5a7263; font-size:.72rem; display:block; }
+
+  .hud{
+    display:flex; gap:6px; justify-content:center;
+  }
+  .hud .chip{
+    background:var(--tarjeta);
+    border-radius:12px;
+    padding:5px 12px;
+    font-size:.82rem;
+    font-weight:700;
+    box-shadow:0 2px 5px rgba(30,50,38,.08);
+    min-width:64px;
+  }
+  .chip .n{ font-size:1rem; }
+  #timer.urgente{ color:var(--mal); animation:parpadeo .6s infinite alternate; }
+  @keyframes parpadeo{ to{ opacity:.35; } }
+  #racha{ color:var(--limpio); }
+
+  /* ---------- Zona de residuo ---------- */
+  .waste-zone{
+    flex:1 1 auto;
+    min-height:96px;
+    display:flex; flex-direction:column;
+    justify-content:center; align-items:center;
+    position:relative;
+  }
+  .waste-item{
+    background:linear-gradient(180deg,#fff3c4,#ffe082);
+    border:2px solid #f6b300;
+    border-radius:18px;
+    padding:14px 20px;
+    font-weight:800;
+    font-size:1.02rem;
+    text-align:center;
+    max-width:82%;
+    box-shadow:0 6px 14px rgba(120,80,0,.22);
+    cursor:grab;
+    touch-action:none;
+    position:relative;
+    z-index:50;
+    line-height:1.25;
+  }
+  .waste-item::before{
+    content:"↕ arrastra";
+    position:absolute; top:-16px; left:50%; transform:translateX(-50%);
+    font-size:.6rem; font-weight:600; color:#8a9a8e; letter-spacing:.06em;
+  }
+  .waste-item.dragging{ cursor:grabbing; transition:none; }
+  .waste-item.volver{ transition:transform .22s ease; }
+  .waste-item.caer{ transition:transform .28s cubic-bezier(.5,0,.9,.4), opacity .28s; opacity:0; }
+  .waste-item.temblar{ animation:temblar .35s; }
+  @keyframes temblar{
+    20%{transform:translateX(-7px)} 40%{transform:translateX(7px)}
+    60%{transform:translateX(-5px)} 80%{transform:translateX(5px)}
+  }
+
+  /* ---------- Mensajes ---------- */
+  #message{
+    min-height:44px;
+    font-size:.82rem; font-weight:700;
+    line-height:1.25;
+    display:flex; align-items:center; justify-content:center;
+    padding:0 6px; text-align:center;
+  }
+  #message.ok{ color:var(--ok); }
+  #message.mal{ color:var(--mal); }
+
+  /* ---------- Contenedores realistas ---------- */
+  .bins-zone{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:8px;
+  }
+  .bin{
+    position:relative;
+    height:118px;
+    display:flex; flex-direction:column;
+    filter:drop-shadow(0 4px 5px rgba(30,50,38,.25));
+    transition:transform .12s;
+  }
+  .bin.over{ transform:translateY(-4px) scale(1.04); }
+  .bin.flash{ animation:flashCorrecto .45s 3; }
+  @keyframes flashCorrecto{
+    50%{ filter:drop-shadow(0 0 10px #ffd600) brightness(1.5); }
+  }
+  .bin.trago{ animation:trago .3s; }
+  @keyframes trago{ 40%{ transform:scaleY(.93) scaleX(1.04); } }
+
+  /* Tapa */
+  .lid{
+    height:16px;
+    margin:0 4px;
+    border-radius:8px 8px 2px 2px;
+    background:var(--c-osc);
+    transform-origin:10% 100%;
+    transition:transform .18s ease;
+    position:relative; z-index:2;
+  }
+  .lid::after{ /* asa de la tapa */
+    content:""; position:absolute; top:3px; left:50%; transform:translateX(-50%);
+    width:26px; height:5px; border-radius:3px;
+    background:rgba(255,255,255,.28);
+  }
+  .bin.over .lid{ transform:rotate(-24deg); }
+
+  /* Cuerpo */
+  .cuerpo{
+    flex:1;
+    background:linear-gradient(160deg, color-mix(in srgb, var(--c) 88%, white) 0%, var(--c) 45%, color-mix(in srgb, var(--c) 78%, black) 100%);
+    border-radius:7px 7px 10px 10px;
+    margin-top:-3px;
+    display:flex; flex-direction:column; align-items:center;
+    padding:8px 5px 4px; box-sizing:border-box;
+    color:#fff;
+    position:relative;
+  }
+  .boca{ /* ranura de entrada */
+    width:70%; height:15px;
+    border-radius:7px;
+    background:rgba(0,0,0,.42);
+    border:2px dashed rgba(255,255,255,.55);
+    box-sizing:border-box;
+    margin-bottom:5px;
+  }
+  .etiqueta{
+    font-size:.6rem; font-weight:800; text-transform:uppercase;
+    text-align:center; letter-spacing:.02em; line-height:1.2;
+    text-shadow:0 1px 2px rgba(0,0,0,.35);
+  }
+  .bin.claro .cuerpo{ color:#4a3c00; }
+  .bin.claro .etiqueta{ text-shadow:none; }
+  .bin.claro .boca{ border-color:rgba(0,0,0,.35); background:rgba(0,0,0,.3); }
+
+  /* Ruedas */
+  .ruedas{
+    position:absolute; bottom:-4px; left:0; right:0;
+    display:flex; justify-content:space-between; padding:0 12px;
+  }
+  .ruedas i{
+    width:11px; height:11px; border-radius:50%;
+    background:#222; border:2px solid #555; box-sizing:border-box;
+  }
+
+  /* Iglú del vidrio */
+  .bin.iglu .lid{ display:none; }
+  .bin.iglu .cuerpo{
+    margin-top:0;
+    border-radius:48px 48px 10px 10px;
+    padding-top:16px;
+  }
+  .bin.iglu .boca{ width:34px; height:26px; border-radius:50%; }
+  .bin.iglu .ruedas{ display:none; }
+  .bin.iglu.over .cuerpo{ box-shadow:inset 0 0 0 3px rgba(255,255,255,.4); }
+
+  /* Punto limpio: caseta con franja de aviso */
+  .bin.caseta .lid{
+    border-radius:3px;
+    background:repeating-linear-gradient(45deg,#ffca28 0 8px,#37474f 8px 16px);
+    transform-origin:50% 100%;
+  }
+  .bin.caseta.over .lid{ transform:translateY(-5px); }
+
+  /* ---------- Paneles (inicio / fin) ---------- */
+  .panel{
+    position:fixed; inset:0;
+    background:rgba(20,35,26,.55);
+    backdrop-filter:blur(3px);
+    display:flex; align-items:center; justify-content:center;
+    padding:16px; z-index:100;
+  }
+  .panel .caja{
+    background:var(--tarjeta);
+    border-radius:18px;
+    max-width:420px; width:100%;
+    max-height:86dvh;
+    overflow-y:auto;
+    padding:20px 18px;
+    box-sizing:border-box;
+    text-align:center;
+    box-shadow:0 18px 40px rgba(0,0,0,.3);
+  }
+  .caja h2{ margin:0 0 6px; color:var(--verde); font-size:1.25rem; }
+  .caja p{ font-size:.85rem; color:#4a5c50; margin:6px 0; line-height:1.4; }
+  .caja .grande{ font-size:2rem; font-weight:800; color:var(--tinta); margin:4px 0; }
+  button.principal{
+    margin-top:12px;
+    padding:12px 30px;
+    font-size:1.05rem; font-weight:800;
+    background:var(--verde); color:#fff;
+    border:none; border-radius:12px;
+    cursor:pointer;
+    box-shadow:0 4px 0 var(--verde-osc);
+  }
+  button.principal:active{ transform:translateY(3px); box-shadow:0 1px 0 var(--verde-osc); }
+
+  .repaso{ text-align:left; margin-top:10px; }
+  .repaso h3{ font-size:.85rem; margin:0 0 6px; }
+  .repaso .fila{
+    display:flex; gap:8px; align-items:flex-start;
+    padding:7px 0; border-top:1px solid #e4ece6;
+    font-size:.76rem; line-height:1.3;
+  }
+  .repaso .punto{
+    flex:0 0 12px; width:12px; height:12px; border-radius:3px; margin-top:2px;
+  }
+  .repaso b{ display:block; }
+  .repaso .destino{ color:#4a5c50; }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header>
+    <h1>EcoReto <small>Recicla según la Ley 7/2022</small></h1>
+  </header>
+
+  <div class="hud">
+    <div class="chip">🏆 <span class="n" id="score">0</span></div>
+    <div class="chip">⏱ <span class="n" id="timer">90</span>s</div>
+    <div class="chip">🔥 <span class="n" id="racha">0</span></div>
+  </div>
+
+  <div class="waste-zone" id="waste-zone"></div>
+
+  <div id="message"></div>
+
+  <div class="bins-zone" id="bins">
+    <div class="bin" data-type="azul" style="--c:var(--azul);--c-osc:var(--azul-osc)">
+      <div class="lid"></div>
+      <div class="cuerpo"><div class="boca"></div><div class="etiqueta">Papel y cartón</div></div>
+      <div class="ruedas"><i></i><i></i></div>
+    </div>
+    <div class="bin claro" data-type="amarillo" style="--c:var(--amarillo);--c-osc:var(--amarillo-osc)">
+      <div class="lid"></div>
+      <div class="cuerpo"><div class="boca"></div><div class="etiqueta">Envases ligeros</div></div>
+      <div class="ruedas"><i></i><i></i></div>
+    </div>
+    <div class="bin iglu" data-type="verde" style="--c:var(--verde);--c-osc:var(--verde-osc)">
+      <div class="lid"></div>
+      <div class="cuerpo"><div class="boca"></div><div class="etiqueta">Vidrio (envases)</div></div>
+      <div class="ruedas"><i></i><i></i></div>
+    </div>
+    <div class="bin" data-type="marron" style="--c:var(--marron);--c-osc:var(--marron-osc)">
+      <div class="lid"></div>
+      <div class="cuerpo"><div class="boca"></div><div class="etiqueta">Orgánico<br>(biorresiduo)</div></div>
+      <div class="ruedas"><i></i><i></i></div>
+    </div>
+    <div class="bin" data-type="gris" style="--c:var(--gris);--c-osc:var(--gris-osc)">
+      <div class="lid"></div>
+      <div class="cuerpo"><div class="boca"></div><div class="etiqueta">Resto / rechazo</div></div>
+      <div class="ruedas"><i></i><i></i></div>
+    </div>
+    <div class="bin caseta" data-type="limpio" style="--c:var(--limpio);--c-osc:var(--limpio-osc)">
+      <div class="lid"></div>
+      <div class="cuerpo"><div class="boca"></div><div class="etiqueta">Punto limpio</div></div>
+      <div class="ruedas"><i></i><i></i></div>
+    </div>
+  </div>
+</div>
+
+<!-- Panel de inicio -->
+<div class="panel" id="panel-inicio">
+  <div class="caja">
+    <h2>♻️ EcoReto: Ley 7/2022</h2>
+    <p>Arrastra cada residuo hasta su contenedor. Recuerda: al <b>amarillo</b> solo van <b>envases</b>; los plásticos que no son envases, los residuos peligrosos y los aparatos van al <b>Punto Limpio</b>.</p>
+    <p>✅ Acierto: <b>+10</b> &nbsp;·&nbsp; ❌ Fallo: <b>−5</b> &nbsp;·&nbsp; 🔥 Racha de 5: <b>+15 extra</b></p>
+    <button class="principal" id="btn-jugar">▶ Jugar (90 s)</button>
+  </div>
+</div>
+
+<!-- Panel final -->
+<div class="panel" id="panel-fin" style="display:none">
+  <div class="caja">
+    <h2>⏰ ¡Tiempo concluido!</h2>
+    <div class="grande" id="fin-puntos"></div>
+    <p id="fin-stats"></p>
+    <div class="repaso" id="fin-repaso"></div>
+    <button class="principal" onclick="startGame()">🔁 Jugar de nuevo</button>
+  </div>
+</div>
+
+<script>
+/* ================= DATOS ================= */
+const CATS = {
+  azul:    { nombre:"Azul (papel y cartón)",    color:"#0d47a1", pista:"Solo papel y cartón limpios y sin plastificar." },
+  amarillo:{ nombre:"Amarillo (envases)",       color:"#fdd835", pista:"Solo ENVASES ligeros: plástico, latas y briks." },
+  verde:   { nombre:"Verde (vidrio)",           color:"#1b5e20", pista:"Solo envases de vidrio: botellas, tarros y frascos. El cristal plano NO es vidrio de envase." },
+  marron:  { nombre:"Marrón (orgánico)",        color:"#5d4037", pista:"Solo biorresiduos: restos de comida y pequeños restos vegetales." },
+  gris:    { nombre:"Gris (fracción resto)",    color:"#6d6d6d", pista:"Lo no reciclable que no es peligroso: higiénicos, colillas, cerámica…" },
+  limpio:  { nombre:"Punto Limpio",             color:"#e65100", pista:"Peligrosos, aparatos, voluminosos y plásticos/metales que NO son envases." }
+};
+
+/* name = residuo · type = contenedor · info = explicación (opcional, para casos con truco) */
+const wasteList = [
+  /* ---- AZUL ---- */
+  { name:"Caja de cartón", type:"azul" },
+  { name:"Periódico viejo", type:"azul" },
+  { name:"Revista", type:"azul" },
+  { name:"Folios usados", type:"azul" },
+  { name:"Bolsa de papel", type:"azul" },
+  { name:"Cartón de huevos (de cartón)", type:"azul" },
+  { name:"Publicidad del buzón", type:"azul" },
+  { name:"Tubo de papel higiénico", type:"azul" },
+  { name:"Caja de cereales (sin bolsa)", type:"azul", info:"La bolsa interior de plástico va al amarillo." },
+  { name:"Caja de zapatos", type:"azul" },
+  { name:"Sobre de papel", type:"azul", info:"Si tiene ventana de plástico, mejor quitarla." },
+  { name:"Cuaderno usado (sin espiral)", type:"azul", info:"La espiral metálica iría al punto limpio." },
+  { name:"Hueveras de cartón", type:"azul" },
+
+  /* ---- AMARILLO (solo envases) ---- */
+  { name:"Botella de plástico de agua", type:"amarillo" },
+  { name:"Lata de refresco", type:"amarillo" },
+  { name:"Lata de conservas", type:"amarillo" },
+  { name:"Brik de leche", type:"amarillo" },
+  { name:"Bolsa de patatas fritas", type:"amarillo" },
+  { name:"Envase de yogur", type:"amarillo" },
+  { name:"Papel de aluminio usado", type:"amarillo", info:"Es envase metálico: al amarillo (mejor limpio de restos)." },
+  { name:"Tapón de plástico", type:"amarillo" },
+  { name:"Chapa de botella", type:"amarillo" },
+  { name:"Film transparente usado", type:"amarillo" },
+  { name:"Bandeja de porexpán (corcho blanco)", type:"amarillo", info:"Es un envase: al amarillo, no al gris." },
+  { name:"Bote de champú vacío", type:"amarillo" },
+  { name:"Bote de desodorante vacío", type:"amarillo", info:"Los aerosoles de uso doméstico VACÍOS son envase metálico." },
+  { name:"Tubo de pasta de dientes", type:"amarillo" },
+  { name:"Tarrina de mantequilla", type:"amarillo" },
+  { name:"Bolsa de plástico", type:"amarillo" },
+  { name:"Vaso de plástico desechable", type:"amarillo" },
+  { name:"Bandeja de aluminio", type:"amarillo" },
+  { name:"Botella de aceite de plástico (vacía)", type:"amarillo", info:"El envase vacío al amarillo; el aceite usado, al punto limpio." },
+  { name:"Tapa metálica de tarro", type:"amarillo", info:"La tapa es metal (amarillo); el tarro de vidrio, al verde." },
+
+  /* ---- VERDE (vidrio de envase) ---- */
+  { name:"Botella de vidrio", type:"verde" },
+  { name:"Botella de vino", type:"verde", info:"Sin el tapón: el corcho natural va al marrón." },
+  { name:"Tarro de mermelada", type:"verde", info:"El tarro al verde; la tapa metálica, al amarillo." },
+  { name:"Frasco de perfume de vidrio", type:"verde" },
+  { name:"Bote de conservas de vidrio", type:"verde" },
+  { name:"Frasco de colonia vacío", type:"verde" },
+  { name:"Botellín de cerveza", type:"verde" },
+
+  /* ---- MARRÓN (biorresiduo) ---- */
+  { name:"Restos de fruta", type:"marron" },
+  { name:"Peladuras de verdura", type:"marron" },
+  { name:"Posos de café (con filtro de papel)", type:"marron" },
+  { name:"Bolsita de infusión", type:"marron" },
+  { name:"Servilleta de papel sucia", type:"marron", info:"El papel manchado de comida es orgánico, no azul." },
+  { name:"Papel de cocina usado", type:"marron", info:"Manchado de alimentos = orgánico." },
+  { name:"Cáscaras de huevo", type:"marron" },
+  { name:"Tapón de corcho natural", type:"marron", info:"El corcho natural es biodegradable." },
+  { name:"Espinas de pescado", type:"marron" },
+  { name:"Huesos de pollo", type:"marron" },
+  { name:"Cáscaras de frutos secos", type:"marron" },
+  { name:"Restos de comida cocinada", type:"marron" },
+  { name:"Flores marchitas", type:"marron" },
+  { name:"Pan duro", type:"marron" },
+  { name:"Pelo del cepillo", type:"marron" },
+
+  /* ---- GRIS (fracción resto) ---- */
+  { name:"Pañal usado", type:"gris" },
+  { name:"Colilla de cigarro", type:"gris" },
+  { name:"Polvo de barrer", type:"gris" },
+  { name:"Plato de cerámica roto", type:"gris", info:"La cerámica NO es vidrio: nunca al verde." },
+  { name:"Compresa / tampón", type:"gris" },
+  { name:"Chicle", type:"gris" },
+  { name:"Excrementos de mascota", type:"gris" },
+  { name:"Arena de gato usada", type:"gris" },
+  { name:"Bastoncillos de los oídos", type:"gris" },
+  { name:"Maquinilla de afeitar desechable", type:"gris" },
+  { name:"Cepillo de dientes viejo", type:"gris", info:"No es envase: aunque sea plástico, va al resto." },
+  { name:"Bolígrafo gastado", type:"gris" },
+  { name:"Esponja de baño usada", type:"gris" },
+  { name:"Copa de cristal rota", type:"gris", info:"El cristal (con plomo) no es vidrio de envase. Envuélvela bien." },
+  { name:"Fotografías antiguas", type:"gris", info:"El papel fotográfico está plastificado: no va al azul." },
+  { name:"Ticket de compra (papel térmico)", type:"gris", info:"El papel térmico no se recicla con el papel normal." },
+  { name:"Tiritas usadas", type:"gris" },
+  { name:"Mascarilla usada", type:"gris" },
+  { name:"Juguete pequeño de goma roto", type:"gris" },
+
+  /* ---- PUNTO LIMPIO: plásticos/metales NO envase ---- */
+  { name:"Juguete de plástico roto", type:"limpio", info:"No es envase: nunca al amarillo." },
+  { name:"Cubo de plástico roto", type:"limpio", info:"Plástico que no es envase." },
+  { name:"Barreño / utensilio de plástico", type:"limpio" },
+  { name:"Herramienta de metal vieja", type:"limpio" },
+  { name:"Sartén vieja", type:"limpio", info:"Metal que no es envase: al punto limpio." },
+  { name:"Tubería de metal", type:"limpio" },
+  { name:"Cables eléctricos", type:"limpio" },
+  { name:"Percha metálica rota", type:"limpio" },
+  { name:"Paraguas roto", type:"limpio" },
+
+  /* ---- PUNTO LIMPIO: vidrio plano, madera, obra, otros ---- */
+  { name:"Cristal de ventana roto", type:"limpio", info:"El vidrio plano tiene otra composición: NO al iglú verde." },
+  { name:"Espejo roto", type:"limpio", info:"El espejo no es vidrio de envase." },
+  { name:"Restos de poda y jardinería", type:"limpio", info:"En cantidad, al punto limpio (los restos pequeños sí van al marrón)." },
+  { name:"Mueble de madera roto", type:"limpio", info:"O solicita la recogida municipal de voluminosos." },
+  { name:"Palet de madera", type:"limpio" },
+  { name:"Escombros de pequeña obra (<1 m³)", type:"limpio" },
+  { name:"Aceite de cocina usado", type:"limpio", info:"En botella cerrada. Muchos municipios tienen contenedor específico de aceite." },
+  { name:"Neumático viejo", type:"limpio", info:"También lo recogen los talleres." },
+  { name:"Cápsulas de café usadas", type:"limpio", info:"O en los puntos de recogida de la propia marca." },
+  { name:"CDs / DVDs viejos", type:"limpio" },
+  { name:"Cinta de casete", type:"limpio" },
+  { name:"Radiador viejo", type:"limpio" },
+
+  /* ---- PUNTO LIMPIO: reutilizables y RAEE ---- */
+  { name:"Ropa vieja o calzado", type:"limpio", info:"También sirven los contenedores de textil (obligatorios desde 2025)." },
+  { name:"Gafas viejas", type:"limpio", info:"Muchas ópticas y ONG las reutilizan." },
+  { name:"Colchón viejo", type:"limpio", info:"O recogida municipal de voluminosos." },
+  { name:"Frigorífico viejo (RAEE)", type:"limpio", info:"Al comprar uno nuevo, la tienda debe retirarlo gratis." },
+  { name:"Televisión o monitor (RAEE)", type:"limpio" },
+  { name:"Ordenador estropeado (RAEE)", type:"limpio" },
+  { name:"Móvil viejo", type:"limpio", info:"También en los puntos RAEE de tiendas de electrónica." },
+  { name:"Cargador de móvil", type:"limpio" },
+  { name:"Tostadora estropeada", type:"limpio" },
+  { name:"Secador de pelo roto", type:"limpio" },
+  { name:"Plancha vieja", type:"limpio" },
+  { name:"Videoconsola estropeada", type:"limpio" },
+  { name:"Cartucho de tinta o tóner", type:"limpio" },
+
+  /* ---- PUNTO LIMPIO: peligrosos ---- */
+  { name:"Aceite de motor usado", type:"limpio", info:"Residuo peligroso: contamina miles de litros de agua." },
+  { name:"Espray de pintura a medias", type:"limpio", info:"Con contenido es peligroso (vacío y de uso doméstico, iría al amarillo)." },
+  { name:"Disolvente, pintura o barniz", type:"limpio" },
+  { name:"Pilas gastadas", type:"limpio", info:"También en los contenedores de pilas de tiendas y marquesinas." },
+  { name:"Batería de coche", type:"limpio" },
+  { name:"Medicamentos caducados", type:"limpio", info:"Mejor aún: al punto SIGRE de tu farmacia." },
+  { name:"Radiografía vieja", type:"limpio", info:"Contiene sales de plata." },
+  { name:"Tubo fluorescente", type:"limpio", info:"Contiene mercurio: nunca al verde ni al gris." },
+  { name:"Bombilla de bajo consumo o LED", type:"limpio", info:"Las bombillas no son vidrio de envase." },
+  { name:"Termómetro de mercurio", type:"limpio" },
+  { name:"Insecticida o producto químico", type:"limpio" },
+  { name:"Esmalte de uñas / quitaesmalte", type:"limpio" }
+];
+
+/* Reparto equilibrado por categorías (evita que casi todo sea punto limpio) */
+const PESOS = { azul:.12, amarillo:.18, verde:.09, marron:.16, gris:.15, limpio:.30 };
+
+/* ================= ESTADO ================= */
+let score, timeLeft, racha, aciertos, fallos, current, timerInterval, jugando=false;
+let errores = [];
+let ultimoNombre = null;
+
+const $ = id => document.getElementById(id);
+const scoreEl=$("score"), timerEl=$("timer"), rachaEl=$("racha"),
+      wasteZone=$("waste-zone"), messageEl=$("message");
+const bins=[...document.querySelectorAll(".bin")];
+
+/* ================= JUEGO ================= */
+function startGame(){
+  $("panel-inicio").style.display="none";
+  $("panel-fin").style.display="none";
+  score=0; timeLeft=90; racha=0; aciertos=0; fallos=0; errores=[]; jugando=true;
+  scoreEl.textContent=0; rachaEl.textContent=0;
+  timerEl.textContent=timeLeft; timerEl.classList.remove("urgente");
+  setMsg("","");
+  nextWaste();
+  clearInterval(timerInterval);
+  timerInterval=setInterval(()=>{
+    timeLeft--;
+    timerEl.textContent=timeLeft;
+    if(timeLeft<=10) timerEl.classList.add("urgente");
+    if(timeLeft<=0){ clearInterval(timerInterval); endGame(); }
+  },1000);
+}
+
+function elegirResiduo(){
+  // 1) elegir categoría por peso, 2) elegir ítem de esa categoría
+  let intento=0, item;
+  do{
+    const r=Math.random(); let acc=0, cat="limpio";
+    for(const [c,p] of Object.entries(PESOS)){ acc+=p; if(r<=acc){ cat=c; break; } }
+    const pool=wasteList.filter(w=>w.type===cat);
+    item=pool[Math.floor(Math.random()*pool.length)];
+  }while(item.name===ultimoNombre && ++intento<8);
+  ultimoNombre=item.name;
+  return item;
+}
+
+function nextWaste(){
+  wasteZone.innerHTML="";
+  if(!jugando) return;
+  current=elegirResiduo();
+  const el=document.createElement("div");
+  el.className="waste-item";
+  el.textContent=current.name;
+  makeDraggable(el);
+  wasteZone.appendChild(el);
+}
+
+/* ---------- Arrastre con Pointer Events (táctil + ratón) ---------- */
+function makeDraggable(item){
+  let sx, sy, activo=false;
+
+  item.addEventListener("pointerdown", e=>{
+    if(!jugando) return;
+    e.preventDefault();
+    activo=true;
+    item.setPointerCapture(e.pointerId);
+    sx=e.clientX; sy=e.clientY;
+    item.classList.add("dragging");
+    item.classList.remove("volver");
+  });
+
+  item.addEventListener("pointermove", e=>{
+    if(!activo) return;
+    item.style.transform=`translate(${e.clientX-sx}px, ${e.clientY-sy}px) scale(1.06)`;
+    marcarBin(e.clientX, e.clientY);
+  });
+
+  const soltar = e=>{
+    if(!activo) return;
+    activo=false;
+    item.classList.remove("dragging");
+    bins.forEach(b=>b.classList.remove("over"));
+    const bin=binEn(e.clientX, e.clientY);
+    if(bin){ evaluar(bin, item, e.clientX, e.clientY); }
+    else{
+      item.classList.add("volver");
+      item.style.transform="translate(0,0)";
+    }
+  };
+  item.addEventListener("pointerup", soltar);
+  item.addEventListener("pointercancel", soltar);
+}
+
+function binEn(x,y){
+  return bins.find(b=>{
+    const r=b.getBoundingClientRect();
+    return x>=r.left && x<=r.right && y>=r.top && y<=r.bottom;
+  }) || null;
+}
+function marcarBin(x,y){
+  const activo=binEn(x,y);
+  bins.forEach(b=>b.classList.toggle("over", b===activo));
+}
+
+/* ---------- Evaluación ---------- */
+function evaluar(bin, item){
+  if(!jugando) return;
+  const elegido=bin.dataset.type, correcto=current.type;
+
+  if(elegido===correcto){
+    aciertos++; racha++;
+    let pts=10, extra="";
+    if(racha%5===0){ pts+=15; extra=` 🔥 ¡Racha de ${racha}! +15`; }
+    score+=pts;
+    scoreEl.textContent=score; rachaEl.textContent=racha;
+    setMsg(`✅ ¡Correcto! +${pts}.${extra} ${current.info?("💡 "+current.info):""}`,"ok");
+
+    // animación: el residuo cae dentro del contenedor
+    const boca=bin.querySelector(".boca").getBoundingClientRect();
+    const ir=item.getBoundingClientRect();
+    item.classList.add("caer");
+    item.style.transform=`translate(${boca.left+boca.width/2-(ir.left+ir.width/2)}px, ${boca.top-(ir.top+ir.height/2)}px) scale(.12)`;
+    bin.classList.remove("trago"); void bin.offsetWidth; bin.classList.add("trago");
+    setTimeout(nextWaste, 290);
+  }else{
+    fallos++; racha=0; rachaEl.textContent=0;
+    score=Math.max(0, score-5);
+    scoreEl.textContent=score;
+    if(!errores.some(e=>e.name===current.name)) errores.push(current);
+
+    const cat=CATS[correcto];
+    setMsg(`❌ "${current.name}" → ${cat.nombre}. ${current.info || cat.pista}`,"mal");
+
+    // parpadea el contenedor correcto para enseñar
+    const binOK=bins.find(b=>b.dataset.type===correcto);
+    binOK.classList.remove("flash"); void binOK.offsetWidth; binOK.classList.add("flash");
+
+    item.classList.add("temblar");
+    item.style.transform="translate(0,0)";
+    setTimeout(nextWaste, 900);
+  }
+}
+
+function setMsg(txt, cls){
+  messageEl.textContent=txt;
+  messageEl.className=cls;
+}
+
+/* ---------- Fin de partida ---------- */
+function endGame(){
+  jugando=false;
+  wasteZone.innerHTML="";
+  setMsg("","");
+  $("fin-puntos").textContent=`${score} puntos`;
+  const total=aciertos+fallos;
+  const pct=total? Math.round(aciertos*100/total):0;
+  let valor = pct>=90? "🌟 ¡Nivel experto en reciclaje!" :
+              pct>=70? "💪 ¡Muy bien! Casi experto." :
+              pct>=50? "🌱 Buen comienzo, sigue practicando." :
+                       "📖 Repasa los casos con truco y vuelve a intentarlo.";
+  $("fin-stats").innerHTML=`Aciertos: <b>${aciertos}</b> · Fallos: <b>${fallos}</b> · Precisión: <b>${pct}%</b><br>${valor}`;
+
+  const rep=$("fin-repaso");
+  if(errores.length){
+    rep.innerHTML="<h3>📚 Repaso de tus fallos:</h3>"+errores.map(e=>{
+      const c=CATS[e.type];
+      return `<div class="fila">
+        <span class="punto" style="background:${c.color}"></span>
+        <div><b>${e.name}</b>
+        <span class="destino">→ ${c.nombre}. ${e.info||""}</span></div>
+      </div>`;
+    }).join("");
+  }else{
+    rep.innerHTML= total? "<p>🎉 ¡Partida perfecta, sin ningún fallo!</p>" : "";
+  }
+  $("panel-fin").style.display="flex";
+}
+
+$("btn-jugar").addEventListener("click", startGame);
+</script>
+</body>
+</html>
